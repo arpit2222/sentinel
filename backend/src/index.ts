@@ -88,17 +88,29 @@ app.post('/api/positions', async (req, res) => {
   }
 });
 
-// Executions
-app.get('/api/users/:address/executions', async (req, res) => {
+// Get Executions
+app.get('/api/users/:userId/executions', async (req, res) => {
   try {
-    const executions = await RescueExecution.find({ userAddress: req.params.address }).sort({ executedAt: -1 });
+    const executions = await RescueExecution.find({ userAddress: req.params.userId }).sort({ executedAt: -1 }).limit(10);
     res.json(executions);
-  } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Registries
+// Clear Dashboard
+app.delete('/api/users/:userId/clear', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    await Position.deleteMany({ userAddress: userId });
+    await RescueExecution.deleteMany({ userAddress: userId });
+    res.json({ message: 'Dashboard cleared' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Seed Demo Positionries
 app.get('/api/protocols', async (req, res) => {
   try {
     const protocols = await Protocol.find();
