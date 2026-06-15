@@ -1,4 +1,4 @@
-const VENICE_API_KEY = process.env.VENICE_API_KEY || 'VENICE_INFERENCE_KEY_4pi_gcpZbXp8JMfHjyFLHZTkyck6YVETbfgXo8fP_-';
+const VENICE_API_KEY = process.env.VENICE_API_KEY;
 const VENICE_API_URL = 'https://api.venice.ai/api/v1/chat/completions';
 
 async function callVeniceAI(prompt: string, systemPrompt: string = "You are a DeFi risk assessment AI. Always reply with valid JSON only.") {
