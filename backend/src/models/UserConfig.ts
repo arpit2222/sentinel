@@ -15,6 +15,7 @@ export interface IUserConfig extends Document {
   executorAgentAddress: string;
   maxRepayPerTx: number;
   delegationValidUntil: number;
+  veniceApiKey?: string;
 }
 
 const UserConfigSchema: Schema = new Schema({
@@ -31,7 +32,8 @@ const UserConfigSchema: Schema = new Schema({
   monitorAgentAddress: { type: String },
   executorAgentAddress: { type: String },
   maxRepayPerTx: { type: Number, default: 5000 },
-  delegationValidUntil: { type: Number }
+  delegationValidUntil: { type: Number },
+  veniceApiKey: { type: String }
 }, { timestamps: true });
 
 export default mongoose.model<IUserConfig>('UserConfig', UserConfigSchema);

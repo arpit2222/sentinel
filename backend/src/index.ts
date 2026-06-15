@@ -28,14 +28,15 @@ app.post('/api/chat', async (req, res) => {
     
     // Gather context
     const positions = await Position.find({ userAddress: userId });
-    const executions = await RescueExecution.find({ userId }).sort({ executedAt: -1 }).limit(3);
+    const executions = await RescueExecution.find({ userAddress: userId }).sort({ executedAt: -1 }).limit(3);
+    const config = await UserConfig.findOne({ address: userId });
     
     const context = {
       activePositions: positions,
       recentRescues: executions
     };
 
-    const reply = await veniceAI.chatWithContext(message, context);
+    const reply = await veniceAI.chatWithContext(message, context, config?.veniceApiKey);
     res.json({ reply });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

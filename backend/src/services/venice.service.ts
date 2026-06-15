@@ -1,11 +1,14 @@
-const VENICE_API_KEY = process.env.VENICE_API_KEY;
+const VENICE_API_KEY_ENV = process.env.VENICE_API_KEY;
 const VENICE_API_URL = 'https://api.venice.ai/api/v1/chat/completions';
 
-async function callVeniceAI(prompt: string, systemPrompt: string = "You are a DeFi risk assessment AI. Always reply with valid JSON only.") {
+async function callVeniceAI(prompt: string, userApiKey?: string, systemPrompt: string = "You are a DeFi risk assessment AI. Always reply with valid JSON only.") {
+  const apiKey = userApiKey || VENICE_API_KEY_ENV;
+  if (!apiKey) throw new Error("No API key available");
+  
   const response = await fetch(VENICE_API_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${VENICE_API_KEY}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
@@ -26,7 +29,6 @@ async function callVeniceAI(prompt: string, systemPrompt: string = "You are a De
   const data = await response.json();
   let content = data.choices[0].message.content;
   
-  // Clean up potential markdown formatting around JSON
   if (content.startsWith('```json')) {
     content = content.replace(/```json\n?/, '').replace(/```\n?$/, '');
   } else if (content.startsWith('```')) {
@@ -49,9 +51,7 @@ export const veniceAI = {
     exploitHistory: number;
   }): Promise<{ score: number; reasoning: string }> {
     console.log(`[Venice AI] Scoring Protocol: ${params.protocolName}`);
-    
     const prompt = `Analyze this DeFi protocol and return a JSON object with 'score' (number 0-100, where 100 is highest risk) and 'reasoning' (string explaining why). Protocol: ${params.protocolName}, TVL: $${params.tvl}, Audited: ${params.audited}, Past Exploits: ${params.exploitHistory}.`;
-    
     return await callVeniceAI(prompt);
   },
 
@@ -61,9 +61,7 @@ export const veniceAI = {
     audited: boolean;
   }): Promise<{ score: number; reasoning: string }> {
     console.log(`[Venice AI] Scoring Agent: ${params.agentName}`);
-    
     const prompt = `Analyze this executor agent and return a JSON object with 'score' (number 0-100, where 100 is highest risk) and 'reasoning' (string explaining why). Agent Name: ${params.agentName}, Success Rate: ${params.successRate}%, Audited: ${params.audited}.`;
-    
     return await callVeniceAI(prompt);
   },
 
@@ -74,6 +72,7 @@ export const veniceAI = {
     protocol_safety: string;
     user_risk_tolerance: string;
     live_eth_price: number;
+    userApiKey?: string;
   }): Promise<{ should_repay: boolean; repay_amount: number; urgency: string; reasoning: string }> {
     console.log(`[Venice AI] Evaluating liquidation risk. LTV: ${params.current_ltv}%, Live ETH: $${params.live_eth_price}`);
     
@@ -95,21 +94,20 @@ Return a JSON object ONLY:
 }`;
 
     try {
-      return await callVeniceAI(prompt);
+      return await callVeniceAI(prompt, params.userApiKey);
     } catch (error) {
       console.warn('[Venice AI] API failed, falling back to local simulated response for Demo.', error);
-      // Wait 1.5 seconds to simulate AI reasoning time
       await new Promise(r => setTimeout(r, 1500));
       return {
         should_repay: true,
-        repay_amount: 10500, // Roughly sufficient to restore health
+        repay_amount: 10500,
         urgency: "critical",
         reasoning: `MOCK REASONING: Detected extreme volatility with ETH spot price dropping to $${params.live_eth_price}. LTV spiked to ${params.current_ltv.toFixed(1)}%, exceeding the 80% liquidation limit. Executing immediate partial repayment of 10,500 USDC via 1Shot Relayer to restore position health factor without requiring user signature.`
       };
     }
   },
 
-  async chatWithContext(userMessage: string, context: any): Promise<string> {
+  async chatWithContext(userMessage: string, context: any, userApiKey?: string): Promise<string> {
     console.log(`[Venice AI] Answering user query: ${userMessage.substring(0, 50)}...`);
     
     const systemPrompt = `You are the SENTINEL AI Agent directly talking to the user. 
@@ -120,14 +118,17 @@ Return a JSON object ONLY:
     Answer their question in a helpful, concise, and professional tone. Do not output JSON.`;
 
     try {
+      const apiKey = userApiKey || VENICE_API_KEY_ENV;
+      if (!apiKey) throw new Error("No API key available");
+
       const response = await fetch(VENICE_API_URL, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${VENICE_API_KEY}`,
+          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b', // A standard safe default for Venice
+          model: 'llama-3.3-70b',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userMessage }

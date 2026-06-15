@@ -58,7 +58,8 @@ export async function monitorPositions() {
           current_ltv: currentLtv,
           protocol_safety: protocol.riskScore > 80 ? 'medium_risk' : 'audited_low_risk',
           user_risk_tolerance: 'conservative',
-          live_eth_price: liveEthPrice
+          live_eth_price: liveEthPrice,
+          userApiKey: config.veniceApiKey
         });
 
         if (decision.should_repay) {
