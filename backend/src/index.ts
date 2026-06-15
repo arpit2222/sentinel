@@ -146,6 +146,7 @@ app.post('/api/seed-position', async (req, res) => {
     const address = req.body.address || '0xMockUser';
     await Position.deleteMany({ userAddress: address });
     
+    // Ensure UserConfig exists
     await UserConfig.findOneAndUpdate(
       { address },
       { 
@@ -153,6 +154,17 @@ app.post('/api/seed-position', async (req, res) => {
         autoRepayEnabled: true,
         whitelistedProtocols: ['aave-v3-base'],
         blacklistedTokens: []
+      },
+      { upsert: true }
+    );
+
+    // Ensure Protocol exists for the monitor to read liquidation thresholds
+    await Protocol.findOneAndUpdate(
+      { id: 'aave-v3-base' },
+      {
+        id: 'aave-v3-base', name: 'Aave V3', chainId: 8453, poolAddress: '0x123', oracleAddress: '0x456',
+        liquidationThreshold: 8000, liquidationPenalty: 1500, riskScore: 12, tvl: 150000000, audited: true, exploits: 0,
+        veniceReasoning: 'Audited, high TVL, low risk.'
       },
       { upsert: true }
     );
