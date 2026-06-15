@@ -9,6 +9,8 @@ export default function Dashboard() {
   const [positions, setPositions] = useState<any[]>([]);
   const [executions, setExecutions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSeeding, setIsSeeding] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
   const fetchDashboardData = async (userAddress: string) => {
     try {
@@ -49,14 +51,31 @@ export default function Dashboard() {
   }, [userId]);
 
   const handleSeed = async () => {
-    if (!userId) return;
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    await fetch(`${apiUrl}/api/seed-position`, { 
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address: userId })
-    });
-    fetchDashboardData(userId);
+    if (!userId || isSeeding) return;
+    setIsSeeding(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      await fetch(`${apiUrl}/api/seed-position`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: userId })
+      });
+      await fetchDashboardData(userId);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  const handleClear = async () => {
+    if (!userId || isClearing) return;
+    setIsClearing(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      await fetch(`${apiUrl}/api/users/${userId}/clear`, { method: 'DELETE' });
+      await fetchDashboardData(userId);
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   if (!userId) {
@@ -78,6 +97,8 @@ export default function Dashboard() {
     );
   }
 
+  const hasPosition = positions.length > 0;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
@@ -86,12 +107,24 @@ export default function Dashboard() {
         <div className="glass-card">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-bold flex items-center gap-2"><Activity className="text-blue-500"/> Live Positions</h3>
-            <button 
-              onClick={handleSeed}
-              className="px-3 py-1 bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 rounded flex items-center gap-1 text-sm border border-blue-500/30 transition"
-            >
-              <Play size={14}/> Seed Demo Position
-            </button>
+            <div className="flex gap-2">
+              {hasPosition && (
+                <button 
+                  onClick={handleClear}
+                  disabled={isClearing}
+                  className="px-3 py-1 bg-red-600/20 text-red-400 hover:bg-red-600/40 rounded flex items-center gap-1 text-sm border border-red-500/30 transition disabled:opacity-50"
+                >
+                  {isClearing ? 'Clearing...' : 'Clear Dashboard'}
+                </button>
+              )}
+              <button 
+                onClick={handleSeed}
+                disabled={hasPosition || isSeeding}
+                className="px-3 py-1 bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 rounded flex items-center gap-1 text-sm border border-blue-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Play size={14}/> {isSeeding ? 'Seeding...' : hasPosition ? 'Position Active' : 'Seed Demo Position'}
+              </button>
+            </div>
           </div>
           
           {positions.length === 0 && !loading && (
