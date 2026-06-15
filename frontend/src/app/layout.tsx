@@ -4,7 +4,6 @@ import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Shield, LayoutDashboard, ShieldCheck, Settings } from "lucide-react";
 import Link from "next/link";
-import PasskeyLogin from "@/components/PasskeyLogin";
 import ChatTerminal from "@/components/ChatTerminal";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -49,7 +48,10 @@ export default function RootLayout({
                 </ul>
               </div>
               <div>
-                <PasskeyLogin />
+                <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-center">
+                  <p className="text-xs text-gray-400">Secured by</p>
+                  <p className="text-sm font-bold text-blue-400">1Shot Passkeys</p>
+                </div>
               </div>
             </nav>
             <main className="flex-1 overflow-y-auto p-8">

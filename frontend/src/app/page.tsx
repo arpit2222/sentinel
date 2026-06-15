@@ -1,19 +1,21 @@
 'use client'
 
-import { Activity, ShieldAlert, Zap, TrendingUp, TrendingDown, Clock, Play } from 'lucide-react'
+import { Activity, ShieldAlert, Zap, Clock, Play, Lock } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import PasskeyLogin from '../components/PasskeyLogin'
 
 export default function Dashboard() {
+  const [userId, setUserId] = useState<string | null>(null);
   const [positions, setPositions] = useState<any[]>([]);
   const [executions, setExecutions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (userAddress: string) => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
       const [posRes, execRes] = await Promise.all([
-        fetch(`${apiUrl}/api/users/0xMockUser/positions`),
-        fetch(`${apiUrl}/api/users/0xMockUser/executions`)
+        fetch(`${apiUrl}/api/users/${userAddress}/positions`),
+        fetch(`${apiUrl}/api/users/${userAddress}/executions`)
       ]);
       const pos = await posRes.json();
       const exec = await execRes.json();
@@ -27,16 +29,41 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 3000); // Poll every 3s
+    if (!userId) return;
+    fetchDashboardData(userId);
+    const interval = setInterval(() => fetchDashboardData(userId), 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [userId]);
 
   const handleSeed = async () => {
+    if (!userId) return;
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    await fetch(`${apiUrl}/api/seed-position`, { method: 'POST' });
-    fetchDashboardData();
+    await fetch(`${apiUrl}/api/seed-position`, { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: userId })
+    });
+    fetchDashboardData(userId);
   };
+
+  if (!userId) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center p-4">
+        <div className="glass-card max-w-md w-full text-center space-y-6">
+          <div className="w-16 h-16 bg-blue-600/20 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-500/30">
+            <Lock size={32} />
+          </div>
+          <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+            Secure Authentication
+          </h2>
+          <p className="text-gray-400 pb-4">
+            Authenticate with your device's biometric scanner to unlock your Smart Account. No MetaMask required.
+          </p>
+          <PasskeyLogin onLogin={(id) => setUserId(id)} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -48,14 +75,17 @@ export default function Dashboard() {
             <h3 className="text-xl font-bold flex items-center gap-2"><Activity className="text-blue-500"/> Live Positions</h3>
             <button 
               onClick={handleSeed}
-              className="px-3 py-1 bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 rounded flex items-center gap-1 text-sm border border-blue-500/30"
+              className="px-3 py-1 bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 rounded flex items-center gap-1 text-sm border border-blue-500/30 transition"
             >
               <Play size={14}/> Seed Demo Position
             </button>
           </div>
           
           {positions.length === 0 && !loading && (
-            <p className="text-gray-500">No positions found. Click Seed Demo Position to test.</p>
+            <div className="p-8 text-center border border-dashed border-white/20 rounded-xl">
+              <p className="text-gray-400 mb-2">No active lending positions found for this Smart Account.</p>
+              <p className="text-sm text-gray-500">Click "Seed Demo Position" above to inject a live position.</p>
+            </div>
           )}
 
           {positions.map(pos => {
@@ -118,7 +148,7 @@ export default function Dashboard() {
                 ))}
                 {executions.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-3 text-center text-gray-500">No rescues recorded yet.</td>
+                    <td colSpan={5} className="py-5 text-center text-gray-500">No rescues recorded for this account.</td>
                   </tr>
                 )}
               </tbody>
