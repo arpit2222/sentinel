@@ -1,36 +1,42 @@
 'use client'
 
-import { Activity, ShieldAlert, Zap, TrendingUp, TrendingDown, Clock } from 'lucide-react'
+import { Activity, ShieldAlert, Zap, TrendingUp, TrendingDown, Clock, Play } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 export default function Dashboard() {
-  const [ltv, setLtv] = useState(72);
-  const [isRescuing, setIsRescuing] = useState(false);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [positions, setPositions] = useState<any[]>([]);
+  const [executions, setExecutions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDashboardData = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const [posRes, execRes] = await Promise.all([
+        fetch(`${apiUrl}/api/users/0xMockUser/positions`),
+        fetch(`${apiUrl}/api/users/0xMockUser/executions`)
+      ]);
+      const pos = await posRes.json();
+      const exec = await execRes.json();
+      setPositions(pos);
+      setExecutions(exec);
+    } catch (e) {
+      console.error("Failed to fetch live data", e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Simulate live LTV changes and rescue
-    const interval = setInterval(() => {
-      setLtv(prev => {
-        if (prev >= 80) {
-          setIsRescuing(true);
-          setLogs(l => ["[Monitor] AI Risk Score HIGH. Liquidation imminent. Triggering rescue...", ...l]);
-          setTimeout(() => {
-            setLtv(71);
-            setIsRescuing(false);
-            setLogs(l => ["[Executor] Successfully repaid 2,000 USDC via 1Shot Relayer. LTV reduced to 71%.", ...l]);
-          }, 3000);
-          return prev;
-        }
-        if (isRescuing) return prev;
-        const newLtv = prev + Math.random() * 2;
-        return newLtv;
-      });
-    }, 4000);
+    fetchDashboardData();
+    const interval = setInterval(fetchDashboardData, 3000); // Poll every 3s
     return () => clearInterval(interval);
-  }, [isRescuing]);
+  }, []);
 
-  const ltvColor = ltv < 75 ? 'bg-green-500' : ltv < 80 ? 'bg-yellow-500' : 'bg-red-500';
+  const handleSeed = async () => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    await fetch(`${apiUrl}/api/seed-position`, { method: 'POST' });
+    fetchDashboardData();
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -39,33 +45,50 @@ export default function Dashboard() {
       <div className="col-span-1 lg:col-span-2 space-y-6">
         <div className="glass-card">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold flex items-center gap-2"><Activity className="text-blue-500"/> Monitored Positions</h3>
+            <h3 className="text-xl font-bold flex items-center gap-2"><Activity className="text-blue-500"/> Live Positions</h3>
+            <button 
+              onClick={handleSeed}
+              className="px-3 py-1 bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 rounded flex items-center gap-1 text-sm border border-blue-500/30"
+            >
+              <Play size={14}/> Seed Demo Position
+            </button>
           </div>
           
-          <div className="bg-white/5 rounded-xl p-4 border border-white/10 hover:bg-white/10 transition cursor-pointer">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <p className="font-bold text-lg">Aave V3 (Base)</p>
-                <p className="text-sm text-gray-400">10.5 WETH / 25,000 USDC</p>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold">{ltv.toFixed(1)}%</p>
-                <p className="text-sm text-gray-400">Current LTV</p>
-              </div>
-            </div>
+          {positions.length === 0 && !loading && (
+            <p className="text-gray-500">No positions found. Click Seed Demo Position to test.</p>
+          )}
+
+          {positions.map(pos => {
+            const ltv = pos.ltvPercent || 0;
+            const ltvColor = ltv < 75 ? 'bg-green-500' : ltv < 80 ? 'bg-yellow-500' : 'bg-red-500';
             
-            {/* LTV Bar */}
-            <div className="h-3 w-full bg-gray-800 rounded-full overflow-hidden">
-              <div 
-                className={`h-full transition-all duration-1000 ${ltvColor}`}
-                style={{ width: `${Math.min(ltv, 100)}%` }}
-              ></div>
-            </div>
-            <div className="flex justify-between mt-2 text-xs text-gray-400">
-              <span>Safe (0-75%)</span>
-              <span>Liquidation (82%)</span>
-            </div>
-          </div>
+            return (
+              <div key={pos._id} className="bg-white/5 rounded-xl p-4 border border-white/10 hover:bg-white/10 transition cursor-pointer mb-4">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <p className="font-bold text-lg">{pos.protocolId.toUpperCase()}</p>
+                    <p className="text-sm text-gray-400">{pos.collateralAmount} {pos.collateralToken} / {pos.debtAmount} {pos.debtToken}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold">{ltv.toFixed(1)}%</p>
+                    <p className="text-sm text-gray-400">Live LTV</p>
+                  </div>
+                </div>
+                
+                {/* LTV Bar */}
+                <div className="h-3 w-full bg-gray-800 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-1000 ${ltvColor}`}
+                    style={{ width: `${Math.min(ltv, 100)}%` }}
+                  ></div>
+                </div>
+                <div className="flex justify-between mt-2 text-xs text-gray-400">
+                  <span>Safe (0-75%)</span>
+                  <span>Liquidation (80%)</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="glass-card">
@@ -84,20 +107,20 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="text-sm">
-                <tr className="border-b border-white/5">
-                  <td className="py-3">Aave V3</td>
-                  <td className="py-3">2,000 USDC</td>
-                  <td className="py-3">0.05 USDC</td>
-                  <td className="py-3">80.1% → 71.0%</td>
-                  <td className="py-3"><span className="px-2 py-1 bg-green-500/20 text-green-400 rounded-full text-xs">Success</span></td>
-                </tr>
-                <tr>
-                  <td className="py-3">Morpho</td>
-                  <td className="py-3">500 USDC</td>
-                  <td className="py-3">0.02 USDC</td>
-                  <td className="py-3">85.0% → 80.0%</td>
-                  <td className="py-3"><span className="px-2 py-1 bg-green-500/20 text-green-400 rounded-full text-xs">Success</span></td>
-                </tr>
+                {executions.map(exec => (
+                  <tr key={exec._id} className="border-b border-white/5">
+                    <td className="py-3">{exec.protocolId || 'Aave V3'}</td>
+                    <td className="py-3">{exec.repayAmount} USDC</td>
+                    <td className="py-3">${exec.costUSDC || exec.gasFeeUsd || 0.05}</td>
+                    <td className="py-3">{exec.ltvBefore?.toFixed(1)}% → {exec.ltvAfter?.toFixed(1)}%</td>
+                    <td className="py-3"><span className="px-2 py-1 bg-green-500/20 text-green-400 rounded-full text-xs">Success</span></td>
+                  </tr>
+                ))}
+                {executions.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-3 text-center text-gray-500">No rescues recorded yet.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -108,31 +131,24 @@ export default function Dashboard() {
       <div className="col-span-1 space-y-6">
         <div className="glass-card h-full flex flex-col">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold flex items-center gap-2"><Clock className="text-blue-500"/> Live Activity</h3>
+            <h3 className="text-xl font-bold flex items-center gap-2"><Clock className="text-blue-500"/> Venice AI Logs</h3>
           </div>
           <div className="flex-1 overflow-y-auto space-y-4">
-            {isRescuing && (
-              <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 animate-pulse">
-                <p className="text-sm text-yellow-400 mb-1 flex items-center gap-2"><ShieldAlert size={16}/> Action Required</p>
-                <p className="text-sm">Venice AI scoring risk at 95/100. Executing emergency debt repayment via 1Shot Relayer...</p>
+            
+            {executions.map((exec, i) => (
+              <div key={exec._id} className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
+                <p className="text-sm text-yellow-400 mb-1 flex items-center gap-2"><ShieldAlert size={16}/> Relayer Triggered</p>
+                <p className="text-xs text-gray-400 mb-2">{new Date(exec.executedAt).toLocaleString()}</p>
+                <p className="text-sm text-gray-200">{exec.monitorReasoning || exec.veniceReasoning}</p>
+              </div>
+            ))}
+
+            {executions.length === 0 && (
+              <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                <p className="text-sm text-gray-300">Monitoring positions securely on Base...</p>
               </div>
             )}
             
-            {logs.map((log, i) => (
-              <div key={i} className="p-3 rounded-lg bg-white/5 border border-white/10">
-                <p className="text-xs text-gray-500 mb-1">Just now</p>
-                <p className="text-sm text-gray-300">{log}</p>
-              </div>
-            ))}
-            
-            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-              <p className="text-xs text-gray-500 mb-1">1 hour ago</p>
-              <p className="text-sm text-gray-300">[Venice AI] Agent &quot;Sentinel-Executor-V1&quot; verified. Trust score updated to 95/100.</p>
-            </div>
-            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-              <p className="text-xs text-gray-500 mb-1">2 hours ago</p>
-              <p className="text-sm text-gray-300">User delegated ERC-7710 spending authority to Sentinel.</p>
-            </div>
           </div>
         </div>
       </div>
