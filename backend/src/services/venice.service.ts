@@ -9,7 +9,7 @@ async function callVeniceAI(prompt: string, systemPrompt: string = "You are a De
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'venice-uncensored',
+      model: 'llama-3.3-70b',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt }
@@ -18,8 +18,9 @@ async function callVeniceAI(prompt: string, systemPrompt: string = "You are a De
   });
 
   if (!response.ok) {
-    console.error('Venice AI API Error:', await response.text());
-    throw new Error('Failed to fetch from Venice AI');
+    const errorText = await response.text();
+    console.error(`Venice AI API Error (${response.status}):`, errorText);
+    throw new Error(`Failed to fetch from Venice AI: ${errorText}`);
   }
 
   const data = await response.json();
@@ -113,7 +114,7 @@ Return a JSON object ONLY:
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'venice-uncensored',
+        model: 'llama-3.3-70b', // A standard safe default for Venice
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage }
@@ -122,7 +123,8 @@ Return a JSON object ONLY:
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch from Venice AI');
+      const errorText = await response.text();
+      throw new Error(`Venice API Error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
