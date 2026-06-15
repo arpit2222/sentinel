@@ -29,6 +29,19 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    // Check localStorage on mount
+    const savedId = localStorage.getItem('sentinel_user_id');
+    if (savedId) {
+      setUserId(savedId);
+    }
+  }, []);
+
+  const handleLoginSuccess = (id: string) => {
+    localStorage.setItem('sentinel_user_id', id);
+    setUserId(id);
+  };
+
+  useEffect(() => {
     if (!userId) return;
     fetchDashboardData(userId);
     const interval = setInterval(() => fetchDashboardData(userId), 3000);
@@ -59,7 +72,7 @@ export default function Dashboard() {
           <p className="text-gray-400 pb-4">
             Authenticate with your device's biometric scanner to unlock your Smart Account. No MetaMask required.
           </p>
-          <PasskeyLogin onLogin={(id) => setUserId(id)} />
+          <PasskeyLogin onLogin={handleLoginSuccess} />
         </div>
       </div>
     );
