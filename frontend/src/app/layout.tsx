@@ -5,6 +5,7 @@ import { Providers } from "@/components/Providers";
 import { Shield, LayoutDashboard, ShieldCheck, Settings } from "lucide-react";
 import Link from "next/link";
 import ChatTerminal from "@/components/ChatTerminal";
+import LogoutButton from "@/components/LogoutButton";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -48,10 +49,11 @@ export default function RootLayout({
                 </ul>
               </div>
               <div>
-                <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-center">
+                <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-center mb-4">
                   <p className="text-xs text-gray-400">Secured by</p>
                   <p className="text-sm font-bold text-blue-400">1Shot Passkeys</p>
                 </div>
+                <LogoutButton />
               </div>
             </nav>
             <main className="flex-1 overflow-y-auto p-8">
