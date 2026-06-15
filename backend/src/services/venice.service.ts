@@ -72,22 +72,25 @@ export const veniceAI = {
     current_ltv: number;
     protocol_safety: string;
     user_risk_tolerance: string;
+    live_eth_price: number;
   }): Promise<{ should_repay: boolean; repay_amount: number; urgency: string; reasoning: string }> {
-    console.log(`[Venice AI] Evaluating liquidation risk. LTV: ${params.current_ltv}%`);
+    console.log(`[Venice AI] Evaluating liquidation risk. LTV: ${params.current_ltv}%, Live ETH: $${params.live_eth_price}`);
     
-    const prompt = `You are SENTINEL, an autonomous liquidation protector. Evaluate this position:
+    const prompt = `You are SENTINEL, an autonomous liquidation protector. Evaluate this position on Base Mainnet:
+Live ETH Price: $${params.live_eth_price}
 Liquidation Risk (0-100%): ${params.liquidation_risk}%
 Time to Liquidation: ${params.time_to_liquidation} seconds
 Current LTV: ${params.current_ltv}%
 Protocol Safety: ${params.protocol_safety}
 User Risk Tolerance: ${params.user_risk_tolerance}
 
-Return a JSON object:
+Based on the live ETH price and LTV, decide if a rescue is needed. 
+Return a JSON object ONLY:
 {
   "should_repay": boolean,
   "repay_amount": number (suggest an amount in USDC to repay, e.g. 1000 if urgent, 0 if not),
   "urgency": string ("low", "medium", "high", "critical"),
-  "reasoning": string
+  "reasoning": string (explain the decision citing the live ETH price and LTV)
 }`;
 
     return await callVeniceAI(prompt);

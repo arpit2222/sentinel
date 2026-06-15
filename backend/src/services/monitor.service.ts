@@ -22,23 +22,43 @@ export async function monitorPositions() {
         const protocol = await Protocol.findOne({ id: position.protocolId });
         if (!protocol) continue;
 
-        // Mock current price drop simulation
-        // Real implementation would use Chainlink
-        const mockPriceDrop = Math.random() * 5; // 0 to 5% drop
-        const currentLtv = position.ltvPercent + mockPriceDrop; // simulate LTV increasing
+        // Fetch LIVE ETH Price
+        let liveEthPrice = 3500; // fallback
+        try {
+          const priceRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+          const priceData = await priceRes.json();
+          if (priceData.ethereum && priceData.ethereum.usd) {
+            liveEthPrice = priceData.ethereum.usd;
+          }
+        } catch (e) {
+          console.error('[Monitor] Failed to fetch live ETH price', e);
+        }
+
+        // We assume baseline ETH price was $3800 when position opened
+        const baselinePrice = 3800;
+        
+        // Volatility Multiplier: 
+        // For the demo, we want a small real-world drop to trigger a huge LTV spike so the relayer fires.
+        const VOLATILITY_MULTIPLIER = 50; 
+        
+        const priceDropPercentage = Math.max(0, ((baselinePrice - liveEthPrice) / baselinePrice) * 100);
+        const dynamicLtvIncrease = priceDropPercentage * VOLATILITY_MULTIPLIER;
+
+        const currentLtv = position.ltvPercent + dynamicLtvIncrease;
 
         const liquidationLTV = protocol.liquidationThreshold / 100; // e.g. 80
         const liquidationRisk = (currentLtv / liquidationLTV) * 100;
 
-        // Time to liquidation mock logic
-        const hoursTilLiquidation = (liquidationLTV - currentLtv) / 2; // assuming 2% per hour volatility
+        // Time to liquidation mock logic based on new extreme volatility
+        const hoursTilLiquidation = Math.max(0, (liquidationLTV - currentLtv) / 10); 
         
         const decision = await veniceAI.decideLiquidationAction({
           liquidation_risk: liquidationRisk,
           time_to_liquidation: hoursTilLiquidation * 3600,
           current_ltv: currentLtv,
           protocol_safety: protocol.riskScore > 80 ? 'medium_risk' : 'audited_low_risk',
-          user_risk_tolerance: 'conservative'
+          user_risk_tolerance: 'conservative',
+          live_eth_price: liveEthPrice
         });
 
         if (decision.should_repay) {
