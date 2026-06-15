@@ -129,6 +129,65 @@ app.get('/api/agents', async (req, res) => {
   }
 });
 
+// Create new Agent
+app.post('/api/agents', async (req, res) => {
+  try {
+    const { name, agentType, url, owner } = req.body;
+    const id = name.toLowerCase().replace(/\s+/g, '-');
+    
+    // Mock Venice AI evaluation for hackathon demo
+    const riskScore = Math.floor(Math.random() * 40) + 10; // 10-50 score
+    const veniceReasoning = `Evaluated via Venice AI. Agent exhibits standard ${agentType} patterns. Moderate risk acceptable.`;
+
+    const newAgent = await Agent.create({
+      id,
+      name,
+      agentType,
+      url,
+      owner,
+      riskScore,
+      veniceReasoning,
+      audited: false,
+      ratingScore: 5, // Start with a default 5-star rating from creator
+      ratingCount: 1,
+      feedbacks: [{
+        userId: owner,
+        rating: 5,
+        comment: 'Initial deployment rating.',
+        createdAt: new Date()
+      }]
+    });
+    
+    res.json(newAgent);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Rate an Agent
+app.post('/api/agents/:id/rate', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, rating, comment } = req.body;
+
+    const agent = await Agent.findOne({ id });
+    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+
+    // Append feedback
+    agent.feedbacks.push({ userId, rating, comment, createdAt: new Date() });
+    
+    // Recalculate average rating
+    const totalRating = agent.feedbacks.reduce((sum, f) => sum + f.rating, 0);
+    agent.ratingCount = agent.feedbacks.length;
+    agent.ratingScore = totalRating / agent.ratingCount;
+
+    await agent.save();
+    res.json(agent);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Seed data route for testing
 app.post('/api/seed', async (req, res) => {
   try {
@@ -145,22 +204,30 @@ app.post('/api/seed', async (req, res) => {
       {
         id: 'sentinel-executor-v1', name: 'Sentinel Official Executor', agentType: 'Executor', 
         successCount: 150, failCount: 2, riskScore: 5, owner: '0x789', audited: true,
-        veniceReasoning: 'High success rate. Audited by Sentinel team. Low risk.'
+        veniceReasoning: 'High success rate. Audited by Sentinel team. Low risk.',
+        ratingScore: 4.8, ratingCount: 125,
+        feedbacks: [{ userId: '0xabc', rating: 5, comment: 'Saved me twice.', createdAt: new Date() }]
       },
       {
         id: 'yield-optimizer-pro', name: 'Yield Optimizer Pro', agentType: 'Strategy', 
         successCount: 840, failCount: 15, riskScore: 25, owner: '0x111', audited: true,
-        veniceReasoning: 'Consistent APY generation. Open source contracts. Moderate risk due to complex routing.'
+        veniceReasoning: 'Consistent APY generation. Open source contracts. Moderate risk due to complex routing.',
+        ratingScore: 4.5, ratingCount: 89,
+        feedbacks: []
       },
       {
         id: 'flash-loan-defender', name: 'Flash Loan Defender', agentType: 'Security', 
         successCount: 42, failCount: 0, riskScore: 10, owner: '0x222', audited: true,
-        veniceReasoning: 'Excellent track record in preventing MEV attacks. Highly trusted.'
+        veniceReasoning: 'Excellent track record in preventing MEV attacks. Highly trusted.',
+        ratingScore: 5.0, ratingCount: 12,
+        feedbacks: []
       },
       {
         id: 'degen-ape-bot', name: 'Degen Leverage Bot', agentType: 'Trading', 
         successCount: 12, failCount: 8, riskScore: 95, owner: '0x333', audited: false,
-        veniceReasoning: 'WARNING: Unaudited code. High failure rate. Extreme risk of capital loss.'
+        veniceReasoning: 'WARNING: Unaudited code. High failure rate. Extreme risk of capital loss.',
+        ratingScore: 2.1, ratingCount: 45,
+        feedbacks: [{ userId: '0x999', rating: 1, comment: 'Lost all my ETH.', createdAt: new Date() }]
       }
     ]);
 
