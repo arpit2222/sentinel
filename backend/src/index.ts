@@ -141,11 +141,28 @@ app.post('/api/seed', async (req, res) => {
       veniceReasoning: 'Audited, high TVL, low risk.'
     });
     
-    await Agent.create({
-      id: 'sentinel-executor-v1', name: 'Sentinel Official Executor', agentType: 'Executor', 
-      successCount: 150, failCount: 2, riskScore: 5, owner: '0x789', audited: true,
-      veniceReasoning: 'High success rate. Audited by Sentinel team. Low risk.'
-    });
+    await Agent.create([
+      {
+        id: 'sentinel-executor-v1', name: 'Sentinel Official Executor', agentType: 'Executor', 
+        successCount: 150, failCount: 2, riskScore: 5, owner: '0x789', audited: true,
+        veniceReasoning: 'High success rate. Audited by Sentinel team. Low risk.'
+      },
+      {
+        id: 'yield-optimizer-pro', name: 'Yield Optimizer Pro', agentType: 'Strategy', 
+        successCount: 840, failCount: 15, riskScore: 25, owner: '0x111', audited: true,
+        veniceReasoning: 'Consistent APY generation. Open source contracts. Moderate risk due to complex routing.'
+      },
+      {
+        id: 'flash-loan-defender', name: 'Flash Loan Defender', agentType: 'Security', 
+        successCount: 42, failCount: 0, riskScore: 10, owner: '0x222', audited: true,
+        veniceReasoning: 'Excellent track record in preventing MEV attacks. Highly trusted.'
+      },
+      {
+        id: 'degen-ape-bot', name: 'Degen Leverage Bot', agentType: 'Trading', 
+        successCount: 12, failCount: 8, riskScore: 95, owner: '0x333', audited: false,
+        veniceReasoning: 'WARNING: Unaudited code. High failure rate. Extreme risk of capital loss.'
+      }
+    ]);
 
     res.json({ message: 'Seeded protocols and agents' });
   } catch (error) {
