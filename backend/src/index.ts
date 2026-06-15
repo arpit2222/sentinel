@@ -146,6 +146,17 @@ app.post('/api/seed-position', async (req, res) => {
     const address = req.body.address || '0xMockUser';
     await Position.deleteMany({ userAddress: address });
     
+    await UserConfig.findOneAndUpdate(
+      { address },
+      { 
+        address,
+        autoRepayEnabled: true,
+        whitelistedProtocols: ['aave-v3-base'],
+        blacklistedTokens: []
+      },
+      { upsert: true }
+    );
+
     const newPos = await Position.create({
       id: `pos-${Date.now()}`,
       userAddress: address,
