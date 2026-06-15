@@ -104,11 +104,9 @@ router.post('/verify-registration', async (req, res) => {
 
       delete activeChallenges[userId];
       
-      const prfResults = body.clientExtensionResults?.prf;
-      const derivedKey = prfResults?.results?.first 
-        ? Buffer.from(prfResults.results.first).toString('hex') 
-        : Buffer.from(credentialID).toString('hex').substring(0, 64);
-
+      const derivedKey = credentialID instanceof Uint8Array 
+        ? Buffer.from(credentialID).toString('hex').substring(0, 64)
+        : credentialID.substring(0, 64);
       return res.json({ verified: true, derivedWalletKey: derivedKey });
     }
     
@@ -189,10 +187,7 @@ router.post('/verify-authentication', async (req, res) => {
       await passkey.save();
       delete activeChallenges[userId];
 
-      const prfResults = body.clientExtensionResults?.prf;
-      const derivedKey = prfResults?.results?.first 
-        ? Buffer.from(prfResults.results.first).toString('hex') 
-        : Buffer.from(passkey.credentialID).toString('hex').substring(0, 64);
+      const derivedKey = passkey.credentialID.substring(0, 64);
 
       return res.json({ verified: true, derivedWalletKey: derivedKey });
     }
