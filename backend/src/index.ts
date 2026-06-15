@@ -8,6 +8,7 @@ import RescueExecution from './models/RescueExecution';
 import Protocol from './models/Protocol';
 import Agent from './models/Agent';
 import authRoutes from './routes/auth.route';
+import { veniceAI } from './services/venice.service';
 
 const app = express();
 const PORT = process.env.PORT || 4000;

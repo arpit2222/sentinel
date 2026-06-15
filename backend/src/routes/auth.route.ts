@@ -10,26 +10,24 @@ import { Passkey, activeChallenges } from '../models/Passkey';
 const router = Router();
 const rpName = 'SENTINEL Watchdog';
 
-// Detect origin for WebAuthn dynamically
-const getRPID = () => {
-  if (process.env.FRONTEND_URL) {
-    try {
-      const url = new URL(process.env.FRONTEND_URL);
-      return url.hostname;
-    } catch (e) {
-      return 'localhost';
-    }
+// Dynamic Origin and RP ID detection from headers
+const getOriginInfo = (req: any) => {
+  const origin = req.headers.origin || (process.env.FRONTEND_URL || 'http://localhost:3000');
+  let rpID = 'localhost';
+  try {
+    const url = new URL(origin);
+    rpID = url.hostname;
+  } catch (e) {
+    // fallback
   }
-  return 'localhost';
+  return { origin, rpID };
 };
-
-const rpID = getRPID();
-const origin = process.env.FRONTEND_URL || `http://${rpID}:3000`;
 
 // 1. Generate Registration Options
 router.get('/generate-registration-options', async (req, res) => {
   try {
-    const userId = req.query.userId as string || '0xMockUser';
+    const { origin, rpID } = getOriginInfo(req);
+    const userId = (req.query.userId as string) || '0xMockUser';
     
     // Check for existing passkeys to exclude them
     const existingPasskeys = await Passkey.find({ userId });
@@ -41,7 +39,7 @@ router.get('/generate-registration-options', async (req, res) => {
       userName: userId,
       attestationType: 'none',
       excludeCredentials: existingPasskeys.map(pk => ({
-        id: new Uint8Array(Buffer.from(pk.credentialID, 'base64url')),
+        id: pk.credentialID, // v10+ uses string
         type: 'public-key',
         transports: pk.transports as any,
       })),
@@ -49,19 +47,16 @@ router.get('/generate-registration-options', async (req, res) => {
         residentKey: 'required',
         userVerification: 'preferred',
       },
-      // PRF extension
       extensions: {
         prf: {
           eval: {
             first: new Uint8Array(Buffer.from('sentinel-wallet-seed-v1'.padEnd(32, ' '))),
           }
         }
-      }
+      } as any // Bypass strict typing for experimental PRF
     });
 
-    // Save challenge
     activeChallenges[userId] = options.challenge;
-
     res.json(options);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -71,6 +66,7 @@ router.get('/generate-registration-options', async (req, res) => {
 // 2. Verify Registration Response
 router.post('/verify-registration', async (req, res) => {
   try {
+    const { origin, rpID } = getOriginInfo(req);
     const { userId, body } = req.body;
     const expectedChallenge = activeChallenges[userId];
 
@@ -87,12 +83,18 @@ router.post('/verify-registration', async (req, res) => {
     });
 
     if (verification.verified && verification.registrationInfo) {
-      const { credentialPublicKey, credentialID, counter, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
+      // v13 typings have `credential` instead of flat properties
+      const cred = verification.registrationInfo.credential;
+      const credentialID = cred ? cred.id : (verification.registrationInfo as any).credentialID;
+      const credentialPublicKey = cred ? cred.publicKey : (verification.registrationInfo as any).credentialPublicKey;
+      const counter = cred ? cred.counter : (verification.registrationInfo as any).counter;
+      const credentialDeviceType = (verification.registrationInfo as any).credentialDeviceType || 'singleDevice';
+      const credentialBackedUp = (verification.registrationInfo as any).credentialBackedUp || false;
 
       await Passkey.create({
         userId,
         webAuthnUserId: userId,
-        credentialID: Buffer.from(credentialID).toString('base64url'),
+        credentialID: credentialID instanceof Uint8Array ? Buffer.from(credentialID).toString('base64url') : credentialID,
         credentialPublicKey: Buffer.from(credentialPublicKey),
         counter,
         credentialDeviceType,
@@ -102,11 +104,10 @@ router.post('/verify-registration', async (req, res) => {
 
       delete activeChallenges[userId];
       
-      // Simulate PRF derivation if not present
       const prfResults = body.clientExtensionResults?.prf;
       const derivedKey = prfResults?.results?.first 
         ? Buffer.from(prfResults.results.first).toString('hex') 
-        : Buffer.from(credentialID).toString('hex').substring(0, 64); // Fallback deterministic EVM key sim
+        : Buffer.from(credentialID).toString('hex').substring(0, 64);
 
       return res.json({ verified: true, derivedWalletKey: derivedKey });
     }
@@ -120,13 +121,14 @@ router.post('/verify-registration', async (req, res) => {
 // 3. Generate Authentication Options
 router.get('/generate-authentication-options', async (req, res) => {
   try {
-    const userId = req.query.userId as string || '0xMockUser';
+    const { rpID } = getOriginInfo(req);
+    const userId = (req.query.userId as string) || '0xMockUser';
     const userPasskeys = await Passkey.find({ userId });
 
     const options = await generateAuthenticationOptions({
       rpID,
       allowCredentials: userPasskeys.map(pk => ({
-        id: new Uint8Array(Buffer.from(pk.credentialID, 'base64url')),
+        id: pk.credentialID, // v10+ uses string
         type: 'public-key',
         transports: pk.transports as any,
       })),
@@ -137,11 +139,10 @@ router.get('/generate-authentication-options', async (req, res) => {
             first: new Uint8Array(Buffer.from('sentinel-wallet-seed-v1'.padEnd(32, ' '))),
           }
         }
-      }
+      } as any
     });
 
     activeChallenges[userId] = options.challenge;
-
     res.json(options);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -151,6 +152,7 @@ router.get('/generate-authentication-options', async (req, res) => {
 // 4. Verify Authentication Response
 router.post('/verify-authentication', async (req, res) => {
   try {
+    const { origin, rpID } = getOriginInfo(req);
     const { userId, body } = req.body;
     const expectedChallenge = activeChallenges[userId];
 
@@ -172,23 +174,21 @@ router.post('/verify-authentication', async (req, res) => {
       expectedChallenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
-      authenticator: {
-        credentialID: new Uint8Array(Buffer.from(passkey.credentialID, 'base64url')),
-        credentialPublicKey: passkey.credentialPublicKey,
+      // v13 uses `credential` instead of `authenticator`
+      credential: {
+        id: passkey.credentialID,
+        publicKey: passkey.credentialPublicKey,
         counter: passkey.counter,
         transports: passkey.transports as any,
-      },
+      } as any,
       requireUserVerification: true,
-    });
+    } as any);
 
     if (verification.verified) {
-      // Update counter
       passkey.counter = verification.authenticationInfo.newCounter;
       await passkey.save();
-
       delete activeChallenges[userId];
 
-      // PRF derivation fallback logic
       const prfResults = body.clientExtensionResults?.prf;
       const derivedKey = prfResults?.results?.first 
         ? Buffer.from(prfResults.results.first).toString('hex') 
