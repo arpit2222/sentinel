@@ -21,6 +21,11 @@ export default function PasskeyLogin() {
 
       if (options.error) throw new Error(options.error);
 
+      // Fix PRF Extension Uint8Array serialization issue
+      if (options.extensions?.prf?.eval?.first) {
+        options.extensions.prf.eval.first = new TextEncoder().encode('sentinel-wallet-seed-v1'.padEnd(32, ' '));
+      }
+
       // 2. Prompt biometric / passkey
       let attResp;
       try {
@@ -61,6 +66,11 @@ export default function PasskeyLogin() {
       const options = await resp.json();
 
       if (options.error) throw new Error(options.error);
+
+      // Fix PRF Extension Uint8Array serialization issue
+      if (options.extensions?.prf?.eval?.first) {
+        options.extensions.prf.eval.first = new TextEncoder().encode('sentinel-wallet-seed-v1'.padEnd(32, ' '));
+      }
 
       const asseResp = await startAuthentication(options);
 
