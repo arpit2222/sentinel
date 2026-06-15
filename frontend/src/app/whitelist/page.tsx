@@ -169,31 +169,73 @@ export default function Whitelist() {
       </div>
 
       <div className="glass-card">
-        <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Users className="text-orange-500"/> Agent Whitelist</h3>
-        <div className="grid gap-4">
-          {agents.map(a => (
-            <div key={a.id} className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition cursor-pointer" onClick={() => toggleAgent(a.id)}>
-              <div className="flex items-center gap-4">
-                <input 
-                  type="checkbox" 
-                  checked={whitelistedAgents.includes(a.id)}
-                  onChange={() => {}} // handled by parent div onClick
-                  className="w-5 h-5 rounded border-gray-600 text-blue-500 focus:ring-blue-500 bg-gray-700 cursor-pointer" 
-                />
-                <div>
-                  <h4 className="font-bold text-lg">{a.name}</h4>
-                  <p className="text-sm text-gray-400 max-w-xl">Venice AI: &quot;{a.veniceReasoning || 'Trust verified.'}&quot;</p>
+        <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Users className="text-orange-500"/> Universal AI Agent Directory</h3>
+        <p className="text-gray-400 mb-6 text-sm">Browse, evaluate, and securely delegate permissions to autonomous AI agents across the ecosystem.</p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {agents.map(a => {
+            const isInstalled = whitelistedAgents.includes(a.id);
+            return (
+              <div key={a.id} className={`flex flex-col p-5 bg-white/5 border ${isInstalled ? 'border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'border-white/10'} rounded-xl hover:bg-white/10 transition relative`}>
+                
+                {/* Header */}
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isInstalled ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-800 text-gray-400'}`}>
+                      <Users size={20} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg leading-tight">{a.name}</h4>
+                      <p className="text-xs text-gray-400">{a.agentType} Agent</p>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-1 rounded-md text-xs font-bold border ${getRiskColor(a.riskScore)}`}>
+                    Risk: {a.riskScore}/100
+                  </span>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-2 mb-4 bg-black/20 rounded-lg p-2 text-center text-xs">
+                  <div>
+                    <p className="text-gray-500">Success</p>
+                    <p className="text-green-400 font-bold">{a.successCount}</p>
+                  </div>
+                  <div className="border-l border-r border-white/10">
+                    <p className="text-gray-500">Fails</p>
+                    <p className={a.failCount > 5 ? 'text-red-400 font-bold' : 'text-gray-300 font-bold'}>{a.failCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Audited</p>
+                    <p className={a.audited ? 'text-blue-400 font-bold' : 'text-red-400 font-bold'}>{a.audited ? 'Yes' : 'No'}</p>
+                  </div>
+                </div>
+
+                {/* Venice Reasoning */}
+                <div className="mb-6 flex-1">
+                  <p className="text-sm text-gray-400 italic bg-white/5 p-3 rounded-lg border-l-2 border-blue-500">
+                    "{a.veniceReasoning || 'Trust verified by Venice AI.'}"
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="mt-auto pt-4 border-t border-white/10 flex justify-between items-center">
+                  <p className="text-xs text-gray-500 truncate max-w-[150px]">By: {a.owner}</p>
+                  <button 
+                    onClick={() => toggleAgent(a.id)}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-bold transition flex items-center gap-2 ${
+                      isInstalled 
+                        ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30' 
+                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg'
+                    }`}
+                  >
+                    {isInstalled ? 'Uninstall Agent' : 'Install Agent'}
+                  </button>
                 </div>
               </div>
-              <div className="mt-4 md:mt-0 text-right w-full md:w-auto flex justify-end">
-                <span className={`px-3 py-1 rounded-full text-xs border ${getRiskColor(a.riskScore)}`}>
-                  Risk Score: {a.riskScore}/100
-                </span>
-              </div>
-            </div>
-          ))}
-          {agents.length === 0 && <p className="text-gray-500 text-sm">No agents synced yet. Click "Sync Venice AI Ratings".</p>}
+            );
+          })}
         </div>
+        {agents.length === 0 && <p className="text-gray-500 text-sm mt-4">No agents synced yet. Click "Sync Venice AI Ratings".</p>}
       </div>
     </div>
   )
