@@ -147,6 +147,7 @@ app.post('/api/seed-position', async (req, res) => {
     await Position.deleteMany({ userAddress: address });
     
     const newPos = await Position.create({
+      id: `pos-${Date.now()}`,
       userAddress: address,
       protocolId: 'aave-v3-base',
       collateralToken: 'ETH',
@@ -154,7 +155,6 @@ app.post('/api/seed-position', async (req, res) => {
       debtToken: 'USDC',
       debtAmount: 25000,
       ltvPercent: 78, // High LTV, close to 80% liquidation
-      healthFactor: 1.05,
       monitored: true,
       rescueCount: 0
     });
