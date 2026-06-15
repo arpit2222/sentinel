@@ -140,6 +140,31 @@ app.post('/api/seed', async (req, res) => {
   }
 });
 
+// Seed position for hackathon demo
+app.post('/api/seed-position', async (req, res) => {
+  try {
+    const address = req.body.address || '0xMockUser';
+    await Position.deleteMany({ userAddress: address });
+    
+    const newPos = await Position.create({
+      userAddress: address,
+      protocolId: 'aave-v3-base',
+      collateralToken: 'ETH',
+      collateralAmount: 10.5,
+      debtToken: 'USDC',
+      debtAmount: 25000,
+      ltvPercent: 78, // High LTV, close to 80% liquidation
+      healthFactor: 1.05,
+      monitored: true,
+      rescueCount: 0
+    });
+
+    res.json({ message: 'Seeded high-risk position', position: newPos });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
