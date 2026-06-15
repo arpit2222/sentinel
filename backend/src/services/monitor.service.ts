@@ -34,22 +34,14 @@ export async function monitorPositions() {
           console.error('[Monitor] Failed to fetch live ETH price', e);
         }
 
-        // We assume baseline ETH price was $3800 when position opened
-        const baselinePrice = 3800;
-        
-        // Volatility Multiplier: 
-        // For the demo, we want a small real-world drop to trigger a huge LTV spike so the relayer fires.
-        const VOLATILITY_MULTIPLIER = 50; 
-        
-        const priceDropPercentage = Math.max(0, ((baselinePrice - liveEthPrice) / baselinePrice) * 100);
-        const dynamicLtvIncrease = priceDropPercentage * VOLATILITY_MULTIPLIER;
-
-        const currentLtv = position.ltvPercent + dynamicLtvIncrease;
+        // For the hackathon demo, we simulate an ETH flash crash to $2800 to trigger a massive LTV spike
+        const demoEthPrice = 2800; 
+        const currentLtv = (position.debtAmount / (position.collateralAmount * demoEthPrice)) * 100;
 
         const liquidationLTV = protocol.liquidationThreshold / 100; // e.g. 80
         const liquidationRisk = (currentLtv / liquidationLTV) * 100;
 
-        // Time to liquidation mock logic based on new extreme volatility
+        // Time to liquidation mock logic based on extreme volatility
         const hoursTilLiquidation = Math.max(0, (liquidationLTV - currentLtv) / 10); 
         
         const decision = await veniceAI.decideLiquidationAction({
@@ -58,11 +50,11 @@ export async function monitorPositions() {
           current_ltv: currentLtv,
           protocol_safety: protocol.riskScore > 80 ? 'medium_risk' : 'audited_low_risk',
           user_risk_tolerance: 'conservative',
-          live_eth_price: liveEthPrice,
+          live_eth_price: demoEthPrice,
           userApiKey: config.veniceApiKey
         });
 
-        if (decision.should_repay) {
+        if (decision.should_repay && currentLtv >= liquidationLTV) {
           console.log(`[Monitor] Triggering rescue for ${position.id}`);
           
           // Trigger 1Shot Relayer
@@ -76,6 +68,9 @@ export async function monitorPositions() {
           });
 
           if (result.status === 'success') {
+            const newDebt = Math.max(0, position.debtAmount - decision.repay_amount);
+            const newLtv = (newDebt / (position.collateralAmount * demoEthPrice)) * 100;
+
             // Log execution
             await RescueExecution.create({
               txHash: result.txHash,
@@ -84,7 +79,7 @@ export async function monitorPositions() {
               repayAmount: decision.repay_amount,
               costUSDC: result.gasFee,
               ltvBefore: currentLtv,
-              ltvAfter: currentLtv - (decision.repay_amount / position.collateralAmount), // mock new LTV
+              ltvAfter: newLtv,
               status: 'success',
               monitorReasoning: decision.reasoning,
               relayerResponse: result,
@@ -94,15 +89,16 @@ export async function monitorPositions() {
             // Trigger Telegram Alert
             telegramService.sendAlert(`🚨 *SENTINEL ALERT* 🚨\n\nVenice AI detected imminent liquidation on your position!\n\n*Action Taken:*\nRepaid ${decision.repay_amount} USDC via 1Shot Relayer.\nGas Fee: $${result.gasFee} (paid in USDC, no ETH needed).\n\n*Venice Reasoning:*\n_${decision.reasoning}_\n\n✅ Your funds are now safe.`);
 
-            // Update position
+            // Update position with actual debt reduction
             position.rescueCount += 1;
             position.lastRescueTime = new Date();
-            position.ltvPercent = currentLtv - 10; // Drop LTV after rescue
+            position.debtAmount = newDebt;
+            position.ltvPercent = newLtv;
             await position.save();
           }
         } else {
-            // Just update simulated LTV
-            position.ltvPercent = currentLtv > 0 ? currentLtv : position.ltvPercent;
+            // Update the UI to show the current simulated LTV crash without accumulating
+            position.ltvPercent = currentLtv;
             await position.save();
         }
       }
